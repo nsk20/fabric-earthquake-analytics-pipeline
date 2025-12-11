@@ -39,14 +39,6 @@ This project demonstrates an end-to-end ETL pipeline built using **Microsoft Fab
 ![Lakehouse Connection](images/10.png)
 ![Bronze Notebook Rename](images/11.png)
 
-**Key Code Snippet:**
-```python
-# Construct the API URL with start and end dates provided by Data Factory, formatted for geojson output.
-url = f"[https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=](https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=){start_date}&endtime={end_date}"
-
-# Make the GET request to fetch data
-response = requests.get(url)
-# Saves as JSON to Lakehouse
 
 ### Phase 3: The Silver Layer (Transformation)
 The Silver layer cleans and structures the data.
