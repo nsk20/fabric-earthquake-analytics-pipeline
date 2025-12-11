@@ -1,72 +1,89 @@
-# Worldwide Earthquake Data Pipeline on Microsoft Fabric
+# Earthquake Data Pipeline using Microsoft Fabric
 
 ## Project Overview
-This project implements an end-to-end Data Engineering pipeline using **Microsoft Fabric**. It utilizes the **Medallion Architecture** (Bronze, Silver, Gold) to ingest, process, and enrich worldwide earthquake data from the USGS API.
+This project demonstrates an end-to-end ETL pipeline built using **Microsoft Fabric**. [cite_start]It ingests global earthquake data from the USGS API [cite: 3][cite_start], processes it using a **Medallion Architecture** (Bronze, Silver, Gold), and orchestrates the workflow using Fabric Data Pipelines[cite: 23, 24].
 
-The pipeline is orchestrated using Fabric Data Pipelines and utilizes Spark Notebooks for data transformation.
+[cite_start]The system is designed to run daily [cite: 39, 40][cite_start], processing data incrementally [cite: 34] [cite_start]and enriching it with geospatial details using custom Python libraries[cite: 17, 18, 19].
 
-## Architecture
-The solution follows a Lakehouse architecture pattern:
-1.  **Bronze Layer:** Ingests raw JSON data from the USGS API.
-2.  **Silver Layer:** Flattens JSON structures, converts data types, and creates Delta tables.
-3.  **Gold Layer:** Enriches data with country codes (using Reverse Geocoding) and classifies earthquake significance.
+## Architecture & Tech Stack
+* **Platform:** Microsoft Fabric
+* [cite_start]**Compute:** Spark (PySpark) [cite: 6]
+* [cite_start]**Orchestration:** Fabric Data Pipelines [cite: 23, 24]
+* [cite_start]**Data Storage:** OneLake (Lakehouse) [cite: 3]
+* [cite_start]**Architecture:** Medallion (Bronze → Silver → Gold) [cite: 9, 15]
+* [cite_start]**Source:** [USGS Earthquake API](https://earthquake.usgs.gov/fdsnws/event/1/#parameters) [cite: 3]
 
-## Prerequisites
-* Microsoft Fabric Workspace
-* Fabric Lakehouse (`earthquakes_lakehouse`)
-* **Custom Environment:** A Spark environment named `Earthquake_env` with the `reverse_geocoder` library installed.
+---
 
-## Pipeline Components
+## Step-by-Step Implementation
 
-### 1. Bronze Layer (Ingestion)
-* **Type:** PySpark Notebook
-* **Function:** Connects to the USGS Earthquake API using dynamic `start_date` and `end_date` parameters.
-* **Output:** Saves raw data as JSON files in the Lakehouse Files section.
-* **Key Code:** Uses `requests` to fetch GeoJSON data.
+### Phase 1: Environment Setup
+1.  [cite_start]**Workspace Creation**: A new Fabric workspace named “Earthquake Project” was created[cite: 1, 2].
+    ![Workspace Creation](images/1.png)
+    ![Workspace Naming](images/2.png)
 
-### 2. Silver Layer (Transformation)
-* **Type:** PySpark Notebook
-* **Function:** Reads the raw JSON files, selects relevant columns (magnitude, place, time, geometry), and casts Unix timestamps to standard Timestamp types.
-* **Output:** Appends data to the `earthquake_events_silver` Delta table.
+2.  [cite_start]**Lakehouse Setup**: A Lakehouse named `earthquakes_lakehouse` was instantiated [cite: 3, 4] to store files and tables.
+    ![Lakehouse Selection](images/3.png)
+    ![Lakehouse Creation](images/4.png)
 
-### 3. Gold Layer (Enrichment)
-* **Type:** PySpark Notebook
-* **Function:** * Filters data based on the execution date.
-    * **Geospatial Enrichment:** Uses `reverse_geocoder` to derive the `country_code` from Latitude and Longitude.
-    * **Classification:** Adds a `sig_class` (Low, Moderate, High) based on the earthquake's significance score.
-* **Output:** Appends final analytical data to the `earthquake_events_gold` Delta table.
+### Phase 2: The Bronze Layer (Ingestion)
+[cite_start]The Bronze layer is responsible for raw data ingestion[cite: 9].
+* **Notebook**: `1. [cite_start]Bronze_layer.ipynb` [cite: 9]
+* [cite_start]**Action**: Fetches geoJSON data from the USGS API based on dynamic start and end dates (`start_date` and `end_date`)[cite: 10].
+* [cite_start]**Storage**: Saves raw JSON files to the Lakehouse "Files" section[cite: 12, 13].
 
-## Orchestration
-The workflow is managed by a Fabric Data Pipeline. It passes dynamic parameters (yesterday's date) to the notebooks to ensure incremental loading.
+![Notebook Creation](images/6.png)
+![Notebook Naming](images/7.png)
+![PySpark Check](images/8.png)
+![Data Source Connection](images/9.png)
+![Lakehouse Connection](images/10.png)
+![Bronze Notebook Rename](images/11.png)
 
-### Pipeline Flow
-The pipeline creates a sequential dependency: `Bronze -> Silver -> Gold`.
-*(See the workflow configuration below)*
+**Key Code Snippet:**
+```python
+# Construct the API URL with start and end dates provided by Data Factory, formatted for geojson output.
+url = f"[https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=](https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=){start_date}&endtime={end_date}"
 
-![Pipeline Activity Flow](images/21_2.png)
+# Make the GET request to fetch data
+response = requests.get(url)
+# Saves as JSON to Lakehouse
 
-### Dynamic Parameters
-The pipeline uses Fabric expression language to calculate dates dynamically:
-* `start_date`: `@formatDateTime(addDays(utcNow(),-1),'yyyy-MM-dd')`
-* `end_date`: `@formatDateTime(utcNow(),'yyyy-MM-dd')`
+### Phase 3: The Silver Layer (Transformation)
+The Silver layer cleans and structures the data.
+* **Notebook**: `2. [cite_start]Silver_layer.ipynb` [cite: 15]
+* [cite_start]**Action**: Reads the raw JSON [cite: 2][cite_start], flattens the nested schema (extracting longitude, latitude, magnitude) [cite: 2][cite_start], and casts columns to correct data types (Timestamp)[cite: 2].
+* [cite_start]**Storage**: Saves as a Delta Table `earthquake_events_silver`[cite: 2].
 
-## Execution & Monitoring
+[cite_start]*Note: The Silver and Gold layers were created/imported later [cite: 15] [cite_start]and connected to the data source[cite: 16].*
 
-### Validation
-Before running, the pipeline is validated to ensure no parameter or connection errors.
+### Phase 4: The Gold Layer (Enrichment)
+The Gold layer adds business value by enriching the data.
+* **Notebook**: `3. [cite_start]Gold_layer.ipynb` [cite: 15]
+* [cite_start]**Custom Environment**: A custom Fabric environment `Earthquake_env` was created [cite: 18] [cite_start]to install the external library `reverse_geocoder`[cite: 17, 19].
+* [cite_start]**Action**: Uses reverse geocoding (with the `reverse_geocoder` library) [cite: 3] [cite_start]to determine the "Country Code" from latitude/longitude [cite: 3] [cite_start]and classifies earthquakes as Low, Moderate, or High significance based on the `sig` column[cite: 3].
+* [cite_start]**Storage**: Saves the final, enriched data as a Delta Table `earthquake_events_gold`[cite: 3].
 
-![Pipeline Validation](images/23.png)
+### Phase 5: Semantic Model
+[cite_start]A new Semantic Model was created using the table from the Lakehouse [cite: 21] [cite_start]to facilitate downstream reporting and BI[cite: 21].
 
-### Pipeline Run
-The pipeline is executed manually or via schedule. The screenshot below shows the successful execution of all three notebook activities.
+---
 
-![Pipeline Run Status](images/24_2.png)
+## Pipeline Orchestration
+[cite_start]To automate the process, a Fabric Data Pipeline was built to run the notebooks sequentially[cite: 23, 26]. 
 
-## Setup Instructions
-1.  **Create Lakehouse:** Create a new Lakehouse named `earthquakes_lakehouse`.
-2.  **Import Notebooks:** Import the Bronze, Silver, and Gold notebooks into your Fabric Workspace.
-3.  **Setup Environment:** Create a Fabric Environment, install `reverse_geocoder`, and attach it to the Gold notebook.
-4.  **Create Pipeline:** * Add the notebooks to a new pipeline.
-    * Connect them sequentially.
-    * Configure the `start_date` and `end_date` parameters in the Settings tab of each activity.
-5.  **Schedule:** Set the pipeline to run daily.
+1.  [cite_start]**Pipeline Setup**: Created a new Pipeline "Earthquake Data Pipeline"[cite: 24, 25].
+2.  [cite_start]**Activity Setup**: Notebook activities were added for Bronze, Silver, and Gold layers[cite: 26, 27].
+3.  [cite_start]**Dynamic Parameters**: The pipeline passes dynamic dates to the notebooks (`1. Bronze_layer`, `2. Silver_layer`, and `3. Gold_layer`) using Fabric expressions[cite: 29].
+    * [cite_start]`start_date` (Yesterday): `@formatDateTime(addDays(utcNow(),-1),'yyyy-MM-dd')` [cite: 31]
+    * [cite_start]`end_date` (Today): `@formatDateTime(utcNow(),'yyyy-MM-dd')` [cite: 32]
+4.  [cite_start]**Dependency Flow**: The notebooks are connected sequentially: Bronze → Silver → Gold[cite: 34, 36].
+
+---
+
+## Validation & Execution
+[cite_start]The pipeline was validated to check for errors[cite: 37].
+
+* [cite_start]**Successful Run**: The pipeline was run [cite: 38] [cite_start]and successfully executed all three layers[cite: 38].
+
+### Scheduling
+[cite_start]The pipeline is scheduled to run daily on a fixed time by setting the start and end dates for the recurrence[cite: 39, 40].
